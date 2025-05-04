@@ -12,7 +12,7 @@ except Exception as e:
 
 # Load Whisper model once at cold start
 def _load_model():
-    print("▶ Loading Whisper model…")
+    print("Loading Whisper model…")
     # Choose from 'base', 'small', 'medium', 'large'
     return whisper.load_model('small')
 
@@ -23,7 +23,7 @@ def handler(event):
     Expects event['input']['audio'] as a base64-encoded audio file.
     Returns the transcribed text.
     """
-    print("▶ Handler invoked")
+    print("Handler invoked")
     inp = event.get('input', {})
     audio_b64 = inp.get('audio')
     if not audio_b64:
@@ -39,17 +39,17 @@ def handler(event):
         tmp.flush()
         tmp.close()
 
-        print(f"▶ Transcribing {tmp.name}…")
+        print(f"Transcribing {tmp.name}…")
         result = model.transcribe(tmp.name)
         text = result.get('text', '')
 
         # Clean up
         os.remove(tmp.name)
-        print("▶ Transcription complete")
+        print("Transcription complete")
         return {'text': text}
 
     except Exception as ex:
-        print("▶ Handler error:", str(ex))
+        print("Handler error:", str(ex))
         return {'error': str(ex)}
 
 if __name__ == '__main__':
