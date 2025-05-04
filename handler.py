@@ -1,7 +1,7 @@
 import os
 import tempfile
+import traceback
 
-# Wrap imports so startup errors appear in logs
 try:
     import runpod
     import base64
@@ -10,20 +10,19 @@ except Exception as e:
     print("▶ Startup failed:", str(e))
     raise
 
-# Load Whisper model once at cold start
+# Load Whisper model once on cold start with GPU support
+device = "cuda" if whisper.cuda.is_available() else "cpu"
+print("▶ CUDA available:", whisper.cuda.is_available())
+print("▶ Using device:", device)
+
 def _load_model():
-    print("Loading Whisper model…")
-    # Choose from 'base', 'small', 'medium', 'large'
-    return whisper.load_model('small')
+    print("▶ Loading Whisper model…")
+    return whisper.load_model('small', device=device)
 
 model = _load_model()
 
 def handler(event):
-    """
-    Expects event['input']['audio'] as a base64-encoded audio file.
-    Returns the transcribed text.
-    """
-    print("Handler invoked")
+    print("▶ Handler invoked")
     inp = event.get('input', {})
     audio_b64 = inp.get('audio')
     if not audio_b64:
@@ -39,19 +38,18 @@ def handler(event):
         tmp.flush()
         tmp.close()
 
-        print(f"Transcribing {tmp.name}…")
+        print(f"▶ Transcribing {tmp.name}…")
         result = model.transcribe(tmp.name)
         text = result.get('text', '')
 
-        # Clean up
         os.remove(tmp.name)
-        print("Transcription complete")
+        print("▶ Transcription complete")
         return {'text': text}
 
     except Exception as ex:
-        print("Handler error:", str(ex))
-        return {'error': str(ex)}
+        print("▶ Handler error:", str(ex))
+        traceback.print_exc()
+        return {'error': str(ex), 'trace': traceback.format_exc()}
 
 if __name__ == '__main__':
-    # Start the Serverless worker
     runpod.serverless.start({'handler': handler})
