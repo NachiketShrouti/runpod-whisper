@@ -1,14 +1,29 @@
-import runpod
-import base64
-import whisper
-import tempfile
 import os
+import tempfile
+
+# Wrap imports so startup errors appear in logs
+try:
+    import runpod
+    import base64
+    import whisper
+except Exception as e:
+    print("▶ Startup failed:", str(e))
+    raise
+
+# Load Whisper model once at cold start
+def _load_model():
+    print("▶ Loading Whisper model…")
+    # Choose from 'base', 'small', 'medium', 'large'
+    return whisper.load_model('small')
+
+model = _load_model()
 
 def handler(event):
     """
     Expects event['input']['audio'] as a base64-encoded audio file.
     Returns the transcribed text.
     """
+    print("▶ Handler invoked")
     inp = event.get('input', {})
     audio_b64 = inp.get('audio')
     if not audio_b64:
@@ -19,29 +34,24 @@ def handler(event):
         audio_bytes = base64.b64decode(audio_b64)
 
         # Write to temporary file
-        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-        tmp_file.write(audio_bytes)
-        tmp_file.flush()
-        tmp_file.close()
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+        tmp.write(audio_bytes)
+        tmp.flush()
+        tmp.close()
 
-        # Transcribe with Whisper model
-        # Model is loaded globally for efficiency
-        result = model.transcribe(tmp_file.name)
+        print(f"▶ Transcribing {tmp.name}…")
+        result = model.transcribe(tmp.name)
         text = result.get('text', '')
 
         # Clean up
-        os.remove(tmp_file.name)
-
+        os.remove(tmp.name)
+        print("▶ Transcription complete")
         return {'text': text}
-    except Exception as e:
-        return {'error': str(e)}
 
-# Load Whisper model once at cold start
-def _load_model():
-    # You can choose 'base', 'small', 'medium', or 'large'
-    return whisper.load_model('small')
-
-model = _load_model()
+    except Exception as ex:
+        print("▶ Handler error:", str(ex))
+        return {'error': str(ex)}
 
 if __name__ == '__main__':
+    # Start the Serverless worker
     runpod.serverless.start({'handler': handler})
